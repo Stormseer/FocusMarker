@@ -1,0 +1,8 @@
+## Interface: 120000, 119999, 110200, 110107, 50500, 40402, 11507
+## Version: 0.1
+## Title: FocusMarker
+## Notes: Helps you with marking and synchronizing markers with your party.
+## Author: Aryella
+## SavedVariables: AryFocusMarkerDB
+
+FocusMarker.lua

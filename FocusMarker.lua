@@ -2,6 +2,7 @@ local ADDON_NAME = "FocusMarker"
 local SAVEDVARS = "AryFocusMarkerDB"
 local MACRO_NAME = "FocusMarker"
 local MACRO_ICON = 1033497
+local settingsCategory
 
 -- default
 local globalDefaults = {
@@ -84,9 +85,6 @@ initFrame:SetScript("OnEvent", function(self, event, addonName)
     if not db.selectedMarker then
         db.selectedMarker = globalDefaults.selectedMarker
     end
-
-    -- Optional: debug print to confirm it's working
-    -- print("|cffffff00[FocusMarker]|r Loaded marker:", db.selectedMarker)
 end)
 
 
@@ -95,70 +93,34 @@ local pendingMacroName = nil
 local pendingMacroIcon = nil
 local pendingMacroBody = nil
 local pendingMacroQueued = false
-
--- Frame to handle queued regen events
-local queuedFrame = CreateFrame("Frame", ADDON_NAME .. "QueuedFrame")
-queuedFrame:SetScript("OnEvent", function(self, event, ...)
-    if event == "PLAYER_REGEN_ENABLED" then
-        -- Try to apply pending macro when combat ends
-        if pendingMacroQueued and not InCombatLockdown() then
-            local ok, err = pcall(function()
-                local mIndex = GetMacroIndexByName(pendingMacroName)
-                if mIndex and mIndex > 0 then
-                    EditMacro(mIndex, pendingMacroName, pendingMacroIcon, pendingMacroBody)
-                else
-                    CreateMacro(pendingMacroName, pendingMacroIcon, pendingMacroBody, nil)
-                end
-            end)
-            if ok then
-                pendingMacroQueued = false
-                pendingMacroName = nil
-                pendingMacroIcon = nil
-                pendingMacroBody = nil
-                queuedFrame:UnregisterEvent("PLAYER_REGEN_ENABLED")
-                print("|cffffff00["..ADDON_NAME.."]|r Macro '"..(db.macroName or MACRO_NAME).."' updated after combat.")
-            else
-                -- If still failing for non-combat reason, clear to avoid infinite retries
-                print("|cffffff00["..ADDON_NAME.."]|r Failed to update macro after combat: "..tostring(err))
-                pendingMacroQueued = false
-                pendingMacroName = nil
-                pendingMacroIcon = nil
-                pendingMacroBody = nil
-                queuedFrame:UnregisterEvent("PLAYER_REGEN_ENABLED")
-            end
-        end
-    end
-end)
-
--- Build the macro body given an index (0..8)
-local function BuildMacroBodyForIndex(idx)
-    local line1 = "/focus [@mouseover,exists,nodead][]"
-    local line2 = "/tm [@mouseover,exists,nodead][] " .. tostring(idx)
-    return line1 .. "\n" .. line2
-end
-
--- Helper function that gets the currently set icon.
-local function GetCurrentMacroIcon()
-    if db and db.macroIconId then
-        return db.macroIconId
-    end
-    return MACRO_ICON
-end
-
+local pendingMacroOldName = nil
 
 -- Try to create or edit macro now; returns true on success, false and err on failure.
-local function ApplyMacroNow(name, icon, body)
+local function ApplyMacroNow(name, icon, body, oldName)
     if InCombatLockdown() then
         return false, "incombat"
     end
 
     local ok, err = pcall(function()
+        -- 1) If a macro with the new name already exists, just edit it
         local mIndex = GetMacroIndexByName(name)
         if mIndex and mIndex > 0 then
             EditMacro(mIndex, name, icon, body)
-        else
-            CreateMacro(name, icon, body, nil) -- global macro
+            return
         end
+
+        -- 2) Otherwise, if we know an old name, try to rename that macro
+        if oldName and oldName ~= name then
+            local oldIndex = GetMacroIndexByName(oldName)
+            if oldIndex and oldIndex > 0 then
+                -- Rename + update body/icon in one go
+                EditMacro(oldIndex, name, icon, body)
+                return
+            end
+        end
+
+        -- 3) No existing macro under either name -> create a new one
+        CreateMacro(name, icon, body, nil) -- global macro
     end)
 
     if not ok then
@@ -168,11 +130,68 @@ local function ApplyMacroNow(name, icon, body)
     return true
 end
 
+-- Frame to handle queued regen events
+local queuedFrame = CreateFrame("Frame", ADDON_NAME .. "QueuedFrame")
+queuedFrame:SetScript("OnEvent", function(self, event, ...)
+    if event == "PLAYER_REGEN_ENABLED" then
+        if pendingMacroQueued and not InCombatLockdown() then
+            local ok, err = ApplyMacroNow(
+                pendingMacroName,
+                pendingMacroIcon,
+                pendingMacroBody,
+                pendingMacroOldName
+            )
+            if ok then
+                pendingMacroQueued = false
+                pendingMacroName = nil
+                pendingMacroIcon = nil
+                pendingMacroBody = nil
+                pendingMacroOldName = nil
+                queuedFrame:UnregisterEvent("PLAYER_REGEN_ENABLED")
+                print("|cffffff00["..ADDON_NAME.."]|r Macro '"..(db.macroName or MACRO_NAME).."' updated after combat.")
+            else
+                print("|cffffff00["..ADDON_NAME.."]|r Failed to update macro after combat: "..tostring(err))
+                pendingMacroQueued = false
+                pendingMacroName = nil
+                pendingMacroIcon = nil
+                pendingMacroBody = nil
+                pendingMacroOldName = nil
+                queuedFrame:UnregisterEvent("PLAYER_REGEN_ENABLED")
+            end
+        end
+    end
+end)
+
+-- Build the macro body given an index (0..8)
+local function BuildMacroBodyForIndex(idx)
+    local lines = {}
+
+    -- Only add the /focus line if we are NOT in mark-only mode
+    if not (db and db.markOnly) then
+        table.insert(lines, "/focus [@mouseover,exists,nodead][]")
+    end
+
+    -- Always add the targeting marker line
+    table.insert(lines, "/tm [@mouseover,exists,nodead][] " .. tostring(idx))
+
+    return table.concat(lines, "\n")
+end
+
+
+-- Helper function that gets the currently set icon.
+local function GetCurrentMacroIcon()
+    if db and db.macroIconId then
+        return db.macroIconId
+    end
+    return MACRO_ICON
+end
+
 -- Queue a macro update to run after combat ends
-local function QueueMacroUpdate(name, icon, body)
+local function QueueMacroUpdate(name, icon, body, oldName)
     pendingMacroName = name
     pendingMacroIcon = icon
     pendingMacroBody = body
+    pendingMacroOldName = oldName
     pendingMacroQueued = true
     queuedFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
     print("|cffffff00["..ADDON_NAME.."]|r In combat: will update macro after combat.")
@@ -183,27 +202,33 @@ local function TryApplyPendingMacro()
     if not pendingMacroQueued then return end
     if InCombatLockdown() then return end
 
-    local ok, err = ApplyMacroNow(pendingMacroName, pendingMacroIcon, pendingMacroBody)
+    local ok, err = ApplyMacroNow(
+        pendingMacroName,
+        pendingMacroIcon,
+        pendingMacroBody,
+        pendingMacroOldName
+    )
     if ok then
         pendingMacroQueued = false
         pendingMacroName = nil
         pendingMacroIcon = nil
         pendingMacroBody = nil
+        pendingMacroOldName = nil  
         queuedFrame:UnregisterEvent("PLAYER_REGEN_ENABLED")
         print("|cffffff00["..ADDON_NAME.."]|r Macro updated after combat.")
     else
         if err ~= "incombat" then
             print("|cffffff00["..ADDON_NAME.."]|r Failed to update macro: "..tostring(err))
-            -- clear queue to avoid infinite retry on non-combat errors
             pendingMacroQueued = false
             pendingMacroName = nil
             pendingMacroIcon = nil
             pendingMacroBody = nil
+            pendingMacroOldName = nil 
             queuedFrame:UnregisterEvent("PLAYER_REGEN_ENABLED")
         end
-        -- if still in combat, do nothing — wait for next regen event
     end
 end
+
 
 -- Core event frame: listens for READY_CHECK and PLAYER_REGEN_ENABLED (regen handled on queuedFrame)
 local frame = CreateFrame("Frame", ADDON_NAME .. "Frame")
@@ -287,6 +312,7 @@ end
 -- Slash Command
 -----------------------------------------------------------------------
 SLASH_FOCUSMARKER1 = "/focusmarker"
+SLASH_FOCUSMARKER2 = "/fm"
 SlashCmdList["FOCUSMARKER"] = function(msg)
     msg = msg and strtrim(msg) or ""
     if msg == "" then
@@ -295,9 +321,23 @@ SlashCmdList["FOCUSMARKER"] = function(msg)
         print("|cffffff00["..ADDON_NAME.."]|r Open Addon Menu for more options.")
         return
     end
-    -- take first token
-    local first = strsplit(" ", msg)
-    SetSelectedMarkerByName(first)
+
+    if msg == "option" or msg == "options" or msg == "menu" then
+        if Settings and Settings.OpenToCategory then
+            if settingsCategory and settingsCategory.GetID then
+                Settings.OpenToCategory(settingsCategory:GetID())
+            else
+                Settings.OpenToCategory(ADDON_NAME)
+            end
+        else
+            print("|cffffff00["..ADDON_NAME.."]|r Unable to open options menu. Try manually?")
+        end
+    else 
+        -- take first token
+        local first = strsplit(" ", msg)
+        SetSelectedMarkerByName(first)
+    end
+    
 end
 
 -----------------------------------------------------------------------
@@ -407,10 +447,44 @@ do
         FocusMarkerOptions.announceCheckbox = checkbox
 
         ----------------------------------------------------------------
+        -- Checkbox: mark only (no focus)
+        ----------------------------------------------------------------
+        if db.markOnly == nil then
+            db.markOnly = false
+        end
+
+        local markOnlyCheckbox = CreateFrame("CheckButton", "FocusMarkerOptionsMarkOnlyCheck", self, "ChatConfigCheckButtonTemplate")
+        markOnlyCheckbox:SetPoint("TOPLEFT", checkbox, "BOTTOMLEFT", 0, -2)
+        markOnlyCheckbox.Text:SetText("Only mark target (do not set focus)")
+        markOnlyCheckbox:SetChecked(db.markOnly)
+
+        markOnlyCheckbox:SetScript("OnClick", function(btn)
+            db.markOnly = btn:GetChecked() and true or false
+
+            -- Rebuild macro with updated behavior
+            local markerName = db.selectedMarker or globalDefaults.selectedMarker
+            local idx = nameToIndex[markerName] or 0
+            local body = BuildMacroBodyForIndex(idx)
+            local icon = GetCurrentMacroIcon()
+            local macroName = db.macroName or MACRO_NAME
+
+            if not InCombatLockdown() then
+                local ok, err = ApplyMacroNow(macroName, icon, body)
+                if not ok and err == "incombat" then
+                    QueueMacroUpdate(macroName, icon, body)
+                end
+            else
+                QueueMacroUpdate(macroName, icon, body)
+            end
+        end)
+
+        FocusMarkerOptions.markOnlyCheckbox = markOnlyCheckbox
+
+        ----------------------------------------------------------------
         -- Edit box: macro name
         ----------------------------------------------------------------
         local nameLabel = self:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
-        nameLabel:SetPoint("TOPLEFT", checkbox, "BOTTOMLEFT", 3, -20)
+        nameLabel:SetPoint("TOPLEFT", markOnlyCheckbox, "BOTTOMLEFT", 3, -20)
         nameLabel:SetText("Macro name:")
 
         local nameEditBox = CreateFrame("EditBox", "FocusMarkerOptionsNameEditBox", self, "InputBoxTemplate")
@@ -422,12 +496,16 @@ do
         nameEditBox:SetText(db.macroName or MACRO_NAME)
 
         local function SaveNameFromEditBox()
+            local oldName = db.macroName or MACRO_NAME
+
             local txt = nameEditBox:GetText()
             if not txt or txt == "" then
                 db.macroName = MACRO_NAME   -- fallback
             else
                 db.macroName = txt
             end
+
+            local newName = db.macroName
 
             -- update macro immediately (or queue)
             local marker = db.selectedMarker or globalDefaults.selectedMarker
@@ -436,12 +514,12 @@ do
             local icon = GetCurrentMacroIcon()
 
             if not InCombatLockdown() then
-                local ok, err = ApplyMacroNow(db.macroName, icon, body)
+                local ok, err = ApplyMacroNow(newName, icon, body, oldName)
                 if not ok and err == "incombat" then
-                    QueueMacroUpdate(db.macroName, icon, body)
+                    QueueMacroUpdate(newName, icon, body, oldName)
                 end
             else
-                QueueMacroUpdate(db.macroName, icon, body)
+                QueueMacroUpdate(newName, icon, body, oldName)
             end
         end
 
@@ -516,7 +594,8 @@ do
         local hint = self:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
         hint:SetPoint("TOPLEFT", iconLabel, "BOTTOMLEFT", 3, -8)
         hint:SetJustifyH("LEFT")
-        hint:SetText("This only accepts Icon ID's. If you want to change it, find a spell/ability on WoWHead and click on the icon, it will show the ID in a popup.\n" ..
+        hint:SetText("This only accepts Icon ID's. \n" ..
+                    "Wowhead can show you icon ID's by navigating to an ability and clicking on the icon.\n" ..
                      "PS: My personal preference is 132177 (The 'Master Marksman' icon).")
 
         local hintMaxCharacters = self:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
@@ -528,9 +607,9 @@ do
     -- Register with Settings / Interface Options
     -------------------------------------------------------------------
     if Settings and Settings.RegisterCanvasLayoutCategory and Settings.RegisterAddOnCategory then
-        local category = Settings.RegisterCanvasLayoutCategory(panel, panel.name)
-        category.ID = panel.name
-        Settings.RegisterAddOnCategory(category)
+        settingsCategory = Settings.RegisterCanvasLayoutCategory(panel, panel.name)
+        --category.ID = panel.name
+        Settings.RegisterAddOnCategory(settingsCategory)
     else
         -- Something is wrong and can't make the options menu. AKA fuck handling multiple client versions. 
         if not FocusMarkerOptions_NoInterfaceOptionsWarning then

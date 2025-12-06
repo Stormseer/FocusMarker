@@ -489,6 +489,7 @@ do
 
         local nameEditBox = CreateFrame("EditBox", "FocusMarkerOptionsNameEditBox", self, "InputBoxTemplate")
         nameEditBox:SetSize(140, 20)
+        nameEditBox:SetMaxLetters(16)
         nameEditBox:SetPoint("LEFT", nameLabel, "RIGHT", 10, 0)
         nameEditBox:SetAutoFocus(false)
 

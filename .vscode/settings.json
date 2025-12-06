@@ -16,6 +16,11 @@
     ],
     "Lua.diagnostics.globals": [
         "SlashCmdList",
-        "Settings"
+        "Settings",
+        "UIDropDownMenu_SetSelectedValue",
+        "UIDropDownMenu_Initialize",
+        "UIDropDownMenu_SetWidth",
+        "UIDropDownMenu_AddButton",
+        "UIDropDownMenu_CreateInfo"
     ]
 }

@@ -54,16 +54,29 @@ local nameToIndex = {
     None = 0,
 }
 
--- saved variables table (will be created by WoW when the addon is loaded)
-if not _G[SAVEDVARS] then
-    _G[SAVEDVARS] = {}
-end
-local db = _G[SAVEDVARS]
+-- saved variables table
+local db
 
--- ensure defaults
-if not db.selectedMarker then
-    db.selectedMarker = globalDefaults.selectedMarker
-end
+local initFrame = CreateFrame("Frame")
+initFrame:RegisterEvent("ADDON_LOADED")
+initFrame:SetScript("OnEvent", function(self, event, addonName)
+    if addonName ~= ADDON_NAME then return end
+
+    -- WoW should have loaded AryFocusMarkerDB from disk by now
+    if not AryFocusMarkerDB then
+        AryFocusMarkerDB = {}
+    end
+
+    db = AryFocusMarkerDB
+
+    if not db.selectedMarker then
+        db.selectedMarker = globalDefaults.selectedMarker
+    end
+
+    -- Optional: debug print to confirm it's working
+    --print("|cffffff00[FocusMarker]|r Loaded marker:", db.selectedMarker)
+end)
+
 
 -- Pending macro update state (used when macro APIs are protected during combat)
 local pendingMacroName = nil

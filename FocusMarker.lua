@@ -40,7 +40,7 @@ local colorAliases = {
     default     = "Star",
 }
 
--- canonical options and lookup to raid target index
+-- Helpers to translate marker names to index and vise versa.
 local optionsOrder = { "Star", "Circle", "Diamond", "Triangle", "Moon", "Square", "Cross", "Skull", "None" }
 local nameToIndex = {
     Star = 1,
@@ -54,6 +54,7 @@ local nameToIndex = {
     None = 0,
 }
 
+-- Icon paths to each marker, for the options menu.
 local markerTextures = {
     Star     = "|TInterface\\TargetingFrame\\UI-RaidTargetingIcon_1:16|t",
     Circle   = "|TInterface\\TargetingFrame\\UI-RaidTargetingIcon_2:16|t",
@@ -63,7 +64,7 @@ local markerTextures = {
     Square   = "|TInterface\\TargetingFrame\\UI-RaidTargetingIcon_6:16|t",
     Cross    = "|TInterface\\TargetingFrame\\UI-RaidTargetingIcon_7:16|t",
     Skull    = "|TInterface\\TargetingFrame\\UI-RaidTargetingIcon_8:16|t",
-    None     = "|TInterface\\Buttons\\UI-GroupLoot-Pass-Up:16|t", -- visual placeholder
+    None     = "|TInterface\\Buttons\\UI-GroupLoot-Pass-Up:16|t", -- A small red circle with a line through.
 }
 
 

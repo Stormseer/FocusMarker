@@ -1,18 +1,14 @@
--- FocusMarker.lua
--- Addon Name: FocusMarker
--- SavedVariables: AryFocusMarkerDB
-
 local ADDON_NAME = "FocusMarker"
 local SAVEDVARS = "AryFocusMarkerDB"
 local MACRO_NAME = "FocusMarker"
-local MACRO_ICON = 132327 -- icon requested
+local MACRO_ICON = 132327
 
 -- default
 local globalDefaults = {
     selectedMarker = "Star"
 }
 
--- alias mapping (user provided)
+-- alias mapping
 local colorAliases = {
     yellow      = "Star",
     y           = "Star",
@@ -185,7 +181,8 @@ frame:SetScript("OnEvent", function(self, event, ...)
             local markerName = db.selectedMarker or globalDefaults.selectedMarker
             local msg = ("My Focus Marker is {%s}"):format(markerName)
             -- Send to party chat
-            SendChatMessage(msg, "PARTY")
+            C_ChatInfo.SendChatMessage(msg, "PARTY")
+
         end
     elseif event == "PLAYER_REGEN_ENABLED" then
         -- allow queuedFrame logic to apply pending macros; also call TryApplyPendingMacro
@@ -215,7 +212,7 @@ local function SetSelectedMarkerByName(name)
         if v == canonical then valid = true; break end
     end
     if not valid then
-        print("|cffffff00["..ADDON_NAME.."]|r Unknown marker '"..tostring(name).."'. Valid commands: Star, Circle, Diamond, Triangle, Moon, Square, Cross, Skull, None.")
+        print("|cffffff00["..ADDON_NAME.."]|r Unknown marker '"..tostring(name).."'. Valid commands are: Star, Circle, Diamond, Triangle, Moon, Square, Cross, Skull, None.")
         return
     end
 
@@ -321,7 +318,7 @@ do
             else
                 local warning = self:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
                 warning:SetPoint("TOPLEFT", label, "BOTTOMLEFT", 0, -8)
-                warning:SetText("Dropdown UI not available in this client build. Use /focusmarker to configure.")
+                warning:SetText("Dropdown UI failed. Use /focusmarker <name|alias|number> to configure.")
             end
         end
     end)
@@ -330,7 +327,7 @@ do
         InterfaceOptions_AddCategory(panel)
     else
         if not FocusMarkerOptions_RegisteredWarningShown then
-            print("|cffffff00[FocusMarker]|r Interface Options API not available in this client. Use /focusmarker <name|alias|number> to configure the addon.")
+            print("|cffffff00[FocusMarker]|r Interface Options failed. Use /focusmarker <name|alias|number> to configure.")
             FocusMarkerOptions_RegisteredWarningShown = true
         end
     end

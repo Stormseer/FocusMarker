@@ -392,7 +392,7 @@ do
         -- Checkbox: announce to party on ready check
         ----------------------------------------------------------------
         if db.announceReadyCheck == nil then
-            db.announceReadyCheck = true -- default ON; behavior wiring later
+            db.announceReadyCheck = true
         end
 
         local checkbox = CreateFrame("CheckButton", "FocusMarkerOptionsAnnounceCheck", self, "ChatConfigCheckButtonTemplate")
@@ -520,8 +520,7 @@ do
                      "PS: My personal preference is 132177 (The 'Master Marksman' icon).")
 
         local hintMaxCharacters = self:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
-        hintMaxCharacters:SetPoint("RIGHT", nameEditBox, "RIGHT", 83, 0)
-        hintMaxCharacters:SetJustifyH("RIGHT")
+        hintMaxCharacters:SetPoint("LEFT", nameEditBox, "RIGHT", 4, 0)
         hintMaxCharacters:SetText("(Max 16 characters)")
     end)
 

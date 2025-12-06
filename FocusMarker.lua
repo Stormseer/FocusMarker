@@ -54,6 +54,19 @@ local nameToIndex = {
     None = 0,
 }
 
+local markerTextures = {
+    Star     = "|TInterface\\TargetingFrame\\UI-RaidTargetingIcon_1:16|t",
+    Circle   = "|TInterface\\TargetingFrame\\UI-RaidTargetingIcon_2:16|t",
+    Diamond  = "|TInterface\\TargetingFrame\\UI-RaidTargetingIcon_3:16|t",
+    Triangle = "|TInterface\\TargetingFrame\\UI-RaidTargetingIcon_4:16|t",
+    Moon     = "|TInterface\\TargetingFrame\\UI-RaidTargetingIcon_5:16|t",
+    Square   = "|TInterface\\TargetingFrame\\UI-RaidTargetingIcon_6:16|t",
+    Cross    = "|TInterface\\TargetingFrame\\UI-RaidTargetingIcon_7:16|t",
+    Skull    = "|TInterface\\TargetingFrame\\UI-RaidTargetingIcon_8:16|t",
+    None     = "|TInterface\\Buttons\\UI-GroupLoot-Pass-Up:16|t", -- visual placeholder
+}
+
+
 -- saved variables table
 local db
 
@@ -62,19 +75,17 @@ initFrame:RegisterEvent("ADDON_LOADED")
 initFrame:SetScript("OnEvent", function(self, event, addonName)
     if addonName ~= ADDON_NAME then return end
 
-    -- WoW should have loaded AryFocusMarkerDB from disk by now
     if not AryFocusMarkerDB then
         AryFocusMarkerDB = {}
     end
 
     db = AryFocusMarkerDB
-
     if not db.selectedMarker then
         db.selectedMarker = globalDefaults.selectedMarker
     end
 
     -- Optional: debug print to confirm it's working
-    --print("|cffffff00[FocusMarker]|r Loaded marker:", db.selectedMarker)
+    -- print("|cffffff00[FocusMarker]|r Loaded marker:", db.selectedMarker)
 end)
 
 
@@ -124,6 +135,15 @@ local function BuildMacroBodyForIndex(idx)
     local line2 = "/tm [@mouseover,exists,nodead][] " .. tostring(idx)
     return line1 .. "\n" .. line2
 end
+
+-- Helper function that gets the currently set icon.
+local function GetCurrentMacroIcon()
+    if db and db.macroIconId then
+        return db.macroIconId
+    end
+    return MACRO_ICON
+end
+
 
 -- Try to create or edit macro now; returns true on success, false and err on failure.
 local function ApplyMacroNow(name, icon, body)
@@ -190,6 +210,11 @@ frame:RegisterEvent("READY_CHECK")
 frame:RegisterEvent("PLAYER_REGEN_ENABLED")
 frame:SetScript("OnEvent", function(self, event, ...)
     if event == "READY_CHECK" then
+        -- Only post to party if user has it configured to.
+        if db and db.announceReadyCheck == false then
+            return
+        end
+
         -- Announce to party chat only when in a party (not raid) and not in combat
         if IsInGroup() and not IsInRaid() and not InCombatLockdown() then
             local markerName = db.selectedMarker or globalDefaults.selectedMarker
@@ -242,10 +267,10 @@ local function SetSelectedMarkerByName(name)
     -- update macro immediately (or queue if combat)
     local idx = nameToIndex[canonical] or 0
     local body = BuildMacroBodyForIndex(idx)
-    local ok, err = ApplyMacroNow(MACRO_NAME, MACRO_ICON, body)
+    local ok, err = ApplyMacroNow(MACRO_NAME, GetCurrentMacroIcon(), body)
     if not ok then
         if err == "incombat" then
-            QueueMacroUpdate(MACRO_NAME, MACRO_ICON, body)
+            QueueMacroUpdate(MACRO_NAME, GetCurrentMacroIcon(), body)
         else
             print("|cffffff00["..ADDON_NAME.."]|r Failed to create/update macro '"..MACRO_NAME.."': "..tostring(err))
         end
@@ -270,4 +295,192 @@ SlashCmdList["FOCUSMARKER"] = function(msg)
     -- take first token
     local first = strsplit(" ", msg)
     SetSelectedMarkerByName(first)
+end
+
+-----------------------------------------------------------------------
+-- Options panel (Settings UI + legacy Interface Options fallback)
+-----------------------------------------------------------------------
+do
+    local panel = CreateFrame("Frame", "FocusMarkerOptionsPanel")
+    panel.name = "FocusMarker"
+    panel:Hide()
+
+    -- Shared table for references from elsewhere (e.g. SetSelectedMarkerByName)
+    FocusMarkerOptions = FocusMarkerOptions or {}
+
+    panel:SetScript("OnShow", function(self)
+        if self.initialized then return end
+        self.initialized = true
+
+        -- Safety: ensure db exists (in case of weird load order)
+        db = db or _G[SAVEDVARS] or {}
+        if not db.selectedMarker then
+            db.selectedMarker = globalDefaults.selectedMarker
+        end
+
+        ----------------------------------------------------------------
+        -- Title & description
+        ----------------------------------------------------------------
+        local title = self:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+        title:SetPoint("TOPLEFT", 16, -16)
+        title:SetText("FocusMarker")
+
+        local desc = self:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+        desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -8)
+        desc:SetJustifyH("LEFT")
+        desc:SetText("Configure the FocusMarker addon.\n" ..
+                     "• Select which raid marker your FocusMarker macro uses.\n" ..
+                     "• Toggle announcing your marker in party chat on ready check.\n" ..
+                     "• Set the macro icon ID (currently just saved, wiring comes later).")
+
+        ----------------------------------------------------------------
+        -- Marker dropdown
+        ----------------------------------------------------------------
+        local markerLabel = self:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+        markerLabel:SetPoint("TOPLEFT", desc, "BOTTOMLEFT", 0, -18)
+        markerLabel:SetText("Selected marker:")
+
+        local dropdown = CreateFrame("Frame", "FocusMarkerOptionsMarkerDropdown", self, "UIDropDownMenuTemplate")
+        dropdown:SetPoint("LEFT", markerLabel, "RIGHT", 16, -3)
+
+        -- Expose to the rest of the addon (used in SetSelectedMarkerByName)
+        FocusMarkerOptions.dropdown = dropdown
+
+        local function MarkerDropdown_OnClick(button)
+            local value = button.value
+            if UIDropDownMenu_SetSelectedValue then
+                UIDropDownMenu_SetSelectedValue(dropdown, value)
+            end
+            if SetSelectedMarkerByName then
+                SetSelectedMarkerByName(value)
+            else
+                db.selectedMarker = value
+            end
+        end
+
+        if UIDropDownMenu_Initialize and UIDropDownMenu_CreateInfo then
+            UIDropDownMenu_Initialize(dropdown, function(frame, level, menuList)
+                local info = UIDropDownMenu_CreateInfo()
+                for _, name in ipairs(optionsOrder) do
+                    local icon = markerTextures[name] or ""
+                    info.text = icon .. "  " .. name   -- icon + label
+                    info.value = name
+                    info.func = MarkerDropdown_OnClick
+                    info.checked = (db.selectedMarker == name)
+                    UIDropDownMenu_AddButton(info)
+                end
+            end)
+
+
+            if UIDropDownMenu_SetWidth then
+                UIDropDownMenu_SetWidth(dropdown, 160)
+            end
+            if UIDropDownMenu_SetSelectedValue then
+                UIDropDownMenu_SetSelectedValue(dropdown, db.selectedMarker or globalDefaults.selectedMarker)
+            end
+        else
+            local warn = self:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+            warn:SetPoint("TOPLEFT", markerLabel, "BOTTOMLEFT", 0, -8)
+            warn:SetText("Dropdown API unavailable in this client. Use /focusmarker to change the marker.")
+        end
+
+        ----------------------------------------------------------------
+        -- Checkbox: announce to party on ready check
+        ----------------------------------------------------------------
+        if db.announceReadyCheck == nil then
+            db.announceReadyCheck = true -- default ON; behavior wiring later
+        end
+
+        local checkbox = CreateFrame("CheckButton", "FocusMarkerOptionsAnnounceCheck", self, "InterfaceOptionsCheckButtonTemplate")
+        checkbox:SetPoint("TOPLEFT", markerLabel, "BOTTOMLEFT", 0, -32)
+        checkbox.Text:SetText("Announce marker in party chat on ready check")
+        checkbox:SetChecked(db.announceReadyCheck)
+
+        checkbox:SetScript("OnClick", function(btn)
+            db.announceReadyCheck = btn:GetChecked() and true or false
+        end)
+
+        FocusMarkerOptions.announceCheckbox = checkbox
+
+        ----------------------------------------------------------------
+        -- Edit box: macro icon ID
+        ----------------------------------------------------------------
+        local iconLabel = self:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+        iconLabel:SetPoint("TOPLEFT", checkbox, "BOTTOMLEFT", 0, -18)
+        iconLabel:SetText("Macro icon ID:")
+
+        local editBox = CreateFrame("EditBox", "FocusMarkerOptionsIconEditBox", self, "InputBoxTemplate")
+        editBox:SetSize(80, 20)
+        editBox:SetPoint("LEFT", iconLabel, "RIGHT", 10, 0)
+        editBox:SetAutoFocus(false)
+
+        -- default to current saved icon or MACRO_ICON
+        local currentIconId = db.macroIconId or MACRO_ICON
+        if currentIconId then
+            editBox:SetText(tostring(currentIconId))
+        end
+
+        local function SaveIconFromEditBox()
+            local txt = editBox:GetText()
+            if not txt or txt == "" then
+                db.macroIconId = nil
+            else
+                local num = tonumber(txt)
+                if num then
+                    db.macroIconId = num
+                else
+                    editBox:SetText(tostring(db.macroIconId or MACRO_ICON or ""))
+                    return
+                end
+            end
+
+            -- optional: immediately re-apply macro with new icon
+            if not InCombatLockdown() then
+                local markerName = db.selectedMarker or globalDefaults.selectedMarker
+                local idx = nameToIndex[markerName] or 0
+                local body = BuildMacroBodyForIndex(idx)
+                local icon = GetCurrentMacroIcon()
+                local ok, err = ApplyMacroNow(MACRO_NAME, icon, body)
+                if not ok and err == "incombat" then
+                    QueueMacroUpdate(MACRO_NAME, icon, body)
+                end
+            end
+        end
+
+
+        editBox:SetScript("OnEnterPressed", function(selfEdit)
+            SaveIconFromEditBox()
+            selfEdit:ClearFocus()
+        end)
+
+        editBox:SetScript("OnEditFocusLost", function(selfEdit)
+            SaveIconFromEditBox()
+        end)
+
+        FocusMarkerOptions.iconEditBox = editBox
+
+        local hint = self:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+        hint:SetPoint("TOPLEFT", iconLabel, "BOTTOMLEFT", 0, -8)
+        hint:SetJustifyH("LEFT")
+        hint:SetText("This currently only saves the icon ID.\nMacro icon usage will be wired into the macro update logic later.")
+    end)
+
+    -------------------------------------------------------------------
+    -- Register with Settings / Interface Options
+    -------------------------------------------------------------------
+    if Settings and Settings.RegisterCanvasLayoutCategory and Settings.RegisterAddOnCategory then
+        -- Retail / modern clients: new Settings UI
+        local category = Settings.RegisterCanvasLayoutCategory(panel, panel.name)
+        category.ID = panel.name
+        Settings.RegisterAddOnCategory(category)
+    elseif InterfaceOptions_AddCategory then
+        -- Older / classic clients: legacy Interface Options
+        InterfaceOptions_AddCategory(panel)
+    else
+        -- Neither API available (very unusual)
+        if not FocusMarkerOptions_NoInterfaceOptionsWarning then
+            FocusMarkerOptions_NoInterfaceOptionsWarning = true
+            print("|cffffff00[FocusMarker]|r Unable to register options panel: no Settings or InterfaceOptions API found.")
+        end
+    end
 end

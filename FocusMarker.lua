@@ -282,7 +282,9 @@ local function SetSelectedMarkerByName(name)
     end
 end
 
--- Slash command
+-----------------------------------------------------------------------
+-- Slash Command
+-----------------------------------------------------------------------
 SLASH_FOCUSMARKER1 = "/focusmarker"
 SlashCmdList["FOCUSMARKER"] = function(msg)
     msg = msg and strtrim(msg) or ""
@@ -298,7 +300,7 @@ SlashCmdList["FOCUSMARKER"] = function(msg)
 end
 
 -----------------------------------------------------------------------
--- Options panel (Settings UI + legacy Interface Options fallback)
+-- Options panel 
 -----------------------------------------------------------------------
 do
     local panel = CreateFrame("Frame", "FocusMarkerOptionsPanel")

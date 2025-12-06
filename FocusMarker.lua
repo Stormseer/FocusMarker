@@ -323,25 +323,22 @@ do
         ----------------------------------------------------------------
         local title = self:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
         title:SetPoint("TOPLEFT", 16, -16)
-        title:SetText("FocusMarker")
+        title:SetText("Focus Marker")
 
         local desc = self:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
         desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -8)
         desc:SetJustifyH("LEFT")
-        desc:SetText("Configure the FocusMarker addon.\n" ..
-                     "• Select which raid marker your FocusMarker macro uses.\n" ..
-                     "• Toggle announcing your marker in party chat on ready check.\n" ..
-                     "• Set the macro icon ID (currently just saved, wiring comes later).")
+        desc:SetText("Made by Aryella on Silvermoon EU")
 
         ----------------------------------------------------------------
         -- Marker dropdown
         ----------------------------------------------------------------
-        local markerLabel = self:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-        markerLabel:SetPoint("TOPLEFT", desc, "BOTTOMLEFT", 0, -18)
+        local markerLabel = self:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+        markerLabel:SetPoint("TOPLEFT", desc, "BOTTOMLEFT", 0, -22)
         markerLabel:SetText("Selected marker:")
 
         local dropdown = CreateFrame("Frame", "FocusMarkerOptionsMarkerDropdown", self, "UIDropDownMenuTemplate")
-        dropdown:SetPoint("LEFT", markerLabel, "RIGHT", 16, -3)
+        dropdown:SetPoint("TOPLEFT", markerLabel, "BOTTOMLEFT", -20, -3)
 
         -- Expose to the rest of the addon (used in SetSelectedMarkerByName)
         FocusMarkerOptions.dropdown = dropdown
@@ -379,7 +376,7 @@ do
                 UIDropDownMenu_SetSelectedValue(dropdown, db.selectedMarker or globalDefaults.selectedMarker)
             end
         else
-            local warn = self:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+            local warn = self:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
             warn:SetPoint("TOPLEFT", markerLabel, "BOTTOMLEFT", 0, -8)
             warn:SetText("Dropdown API unavailable in this client. Use /focusmarker to change the marker.")
         end
@@ -391,8 +388,8 @@ do
             db.announceReadyCheck = true -- default ON; behavior wiring later
         end
 
-        local checkbox = CreateFrame("CheckButton", "FocusMarkerOptionsAnnounceCheck", self, "InterfaceOptionsCheckButtonTemplate")
-        checkbox:SetPoint("TOPLEFT", markerLabel, "BOTTOMLEFT", 0, -32)
+        local checkbox = CreateFrame("CheckButton", "FocusMarkerOptionsAnnounceCheck", self, "ChatConfigCheckButtonTemplate")
+        checkbox:SetPoint("TOPLEFT", dropdown, "BOTTOMLEFT", 15, -20)
         checkbox.Text:SetText("Announce marker in party chat on ready check")
         checkbox:SetChecked(db.announceReadyCheck)
 
@@ -405,8 +402,8 @@ do
         ----------------------------------------------------------------
         -- Edit box: macro icon ID
         ----------------------------------------------------------------
-        local iconLabel = self:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-        iconLabel:SetPoint("TOPLEFT", checkbox, "BOTTOMLEFT", 0, -18)
+        local iconLabel = self:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+        iconLabel:SetPoint("TOPLEFT", checkbox, "BOTTOMLEFT", 0, -20)
         iconLabel:SetText("Macro icon ID:")
 
         local editBox = CreateFrame("EditBox", "FocusMarkerOptionsIconEditBox", self, "InputBoxTemplate")
@@ -447,7 +444,6 @@ do
             end
         end
 
-
         editBox:SetScript("OnEnterPressed", function(selfEdit)
             SaveIconFromEditBox()
             selfEdit:ClearFocus()
@@ -460,24 +456,21 @@ do
         FocusMarkerOptions.iconEditBox = editBox
 
         local hint = self:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
-        hint:SetPoint("TOPLEFT", iconLabel, "BOTTOMLEFT", 0, -8)
+        hint:SetPoint("TOPLEFT", iconLabel, "BOTTOMLEFT", 3, -8)
         hint:SetJustifyH("LEFT")
-        hint:SetText("This currently only saves the icon ID.\nMacro icon usage will be wired into the macro update logic later.")
+        hint:SetText("This only accepts Icon ID's. If you want to change it, find a spell/ability on WoWHead and click on the icon, it will show the ID in a popup.\n" ..
+                     "PS: My personal preference is 132177 (The 'Master Marksman' icon).")
     end)
 
     -------------------------------------------------------------------
     -- Register with Settings / Interface Options
     -------------------------------------------------------------------
     if Settings and Settings.RegisterCanvasLayoutCategory and Settings.RegisterAddOnCategory then
-        -- Retail / modern clients: new Settings UI
         local category = Settings.RegisterCanvasLayoutCategory(panel, panel.name)
         category.ID = panel.name
         Settings.RegisterAddOnCategory(category)
-    elseif InterfaceOptions_AddCategory then
-        -- Older / classic clients: legacy Interface Options
-        InterfaceOptions_AddCategory(panel)
     else
-        -- Neither API available (very unusual)
+        -- Something is wrong and can't make the options menu. AKA fuck handling multiple client versions. 
         if not FocusMarkerOptions_NoInterfaceOptionsWarning then
             FocusMarkerOptions_NoInterfaceOptionsWarning = true
             print("|cffffff00[FocusMarker]|r Unable to register options panel: no Settings or InterfaceOptions API found.")

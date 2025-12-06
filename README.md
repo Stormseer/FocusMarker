@@ -10,7 +10,7 @@ It maintains a macro (default: FocusMarker) in your global macro space, that loo
 ```
 Where the "<1>" changes depending on your configuration (default raid marker: Star/Yellow).
 
-The addon responds to the chat command "/focusmarker". On ready check the addon will also announce to your party (not while in a raid group) what your focus marker is currently set to, to help with potential marker conflicts.
+The addon responds to the chat command "/focusmarker" or "/fm". On ready check the addon will also announce to your party (not while in a raid group) what your focus marker is currently set to, to help with potential marker conflicts.
 
 Usage: 
 | Command     | Description |
@@ -54,3 +54,4 @@ Full list of accepted aliases:
 | Default     | Star        |
 
 Made by Aryella, on Silvermoon EU.
+

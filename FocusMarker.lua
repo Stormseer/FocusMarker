@@ -30,6 +30,7 @@ local colorAliases = {
     square      = "Square",
     red         = "Cross",
     r           = "Cross",
+    x           = "Cross",
     cross       = "Cross",
     white       = "Skull",
     w           = "Skull",
@@ -249,7 +250,8 @@ SlashCmdList["FOCUSMARKER"] = function(msg)
     msg = msg and strtrim(msg) or ""
     if msg == "" then
         print("|cffffff00["..ADDON_NAME.."]|r Current marker: "..(db.selectedMarker or globalDefaults.selectedMarker))
-        print("|cffffff00["..ADDON_NAME.."]|r Usage: /focusmarker <name|alias|number>  (e.g. /focusmarker star  or /focusmarker 1 or /focusmarker off)")
+        print("|cffffff00["..ADDON_NAME.."]|r Usage: /focusmarker <name/number>  (e.g. /focusmarker star  or /focusmarker 1)")
+        print("|cffffff00["..ADDON_NAME.."]|r Open Addon Menu for more options.")
         return
     end
     -- take first token

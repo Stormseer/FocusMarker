@@ -1,7 +1,7 @@
 local ADDON_NAME = "FocusMarker"
 local SAVEDVARS = "AryFocusMarkerDB"
 local MACRO_NAME = "FocusMarker"
-local MACRO_ICON = 132327
+local MACRO_ICON = 1033497
 
 -- default
 local globalDefaults = {
@@ -116,7 +116,7 @@ queuedFrame:SetScript("OnEvent", function(self, event, ...)
                 pendingMacroIcon = nil
                 pendingMacroBody = nil
                 queuedFrame:UnregisterEvent("PLAYER_REGEN_ENABLED")
-                print("|cffffff00["..ADDON_NAME.."]|r Macro '"..MACRO_NAME.."' updated after combat.")
+                print("|cffffff00["..ADDON_NAME.."]|r Macro '"..(db.macroName or MACRO_NAME).."' updated after combat.")
             else
                 -- If still failing for non-combat reason, clear to avoid infinite retries
                 print("|cffffff00["..ADDON_NAME.."]|r Failed to update macro after combat: "..tostring(err))
@@ -268,12 +268,12 @@ local function SetSelectedMarkerByName(name)
     -- update macro immediately (or queue if combat)
     local idx = nameToIndex[canonical] or 0
     local body = BuildMacroBodyForIndex(idx)
-    local ok, err = ApplyMacroNow(MACRO_NAME, GetCurrentMacroIcon(), body)
+    local ok, err = ApplyMacroNow(db.macroName or MACRO_NAME, GetCurrentMacroIcon(), body)
     if not ok then
         if err == "incombat" then
-            QueueMacroUpdate(MACRO_NAME, GetCurrentMacroIcon(), body)
+            QueueMacroUpdate(db.macroName or MACRO_NAME, GetCurrentMacroIcon(), body)
         else
-            print("|cffffff00["..ADDON_NAME.."]|r Failed to create/update macro '"..MACRO_NAME.."': "..tostring(err))
+            print("|cffffff00["..ADDON_NAME.."]|r Failed to create/update macro '"..(db.macroName or MACRO_NAME).."': "..tostring(err))
         end
     end
 
@@ -320,6 +320,10 @@ do
         if not db.selectedMarker then
             db.selectedMarker = globalDefaults.selectedMarker
         end
+        if not db.macroName then
+            db.macroName = MACRO_NAME
+        end
+
 
         ----------------------------------------------------------------
         -- Title & description
@@ -403,10 +407,61 @@ do
         FocusMarkerOptions.announceCheckbox = checkbox
 
         ----------------------------------------------------------------
+        -- Edit box: macro name
+        ----------------------------------------------------------------
+        local nameLabel = self:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+        nameLabel:SetPoint("TOPLEFT", checkbox, "BOTTOMLEFT", 3, -20)
+        nameLabel:SetText("Macro name:")
+
+        local nameEditBox = CreateFrame("EditBox", "FocusMarkerOptionsNameEditBox", self, "InputBoxTemplate")
+        nameEditBox:SetSize(140, 20)
+        nameEditBox:SetPoint("LEFT", nameLabel, "RIGHT", 10, 0)
+        nameEditBox:SetAutoFocus(false)
+
+        -- initial value
+        nameEditBox:SetText(db.macroName or MACRO_NAME)
+
+        local function SaveNameFromEditBox()
+            local txt = nameEditBox:GetText()
+            if not txt or txt == "" then
+                db.macroName = MACRO_NAME   -- fallback
+            else
+                db.macroName = txt
+            end
+
+            -- update macro immediately (or queue)
+            local marker = db.selectedMarker or globalDefaults.selectedMarker
+            local idx = nameToIndex[marker] or 0
+            local body = BuildMacroBodyForIndex(idx)
+            local icon = GetCurrentMacroIcon()
+
+            if not InCombatLockdown() then
+                local ok, err = ApplyMacroNow(db.macroName, icon, body)
+                if not ok and err == "incombat" then
+                    QueueMacroUpdate(db.macroName, icon, body)
+                end
+            else
+                QueueMacroUpdate(db.macroName, icon, body)
+            end
+        end
+
+        nameEditBox:SetScript("OnEnterPressed", function(selfEdit)
+            SaveNameFromEditBox()
+            selfEdit:ClearFocus()
+        end)
+
+        nameEditBox:SetScript("OnEditFocusLost", function(selfEdit)
+            SaveNameFromEditBox()
+        end)
+
+        FocusMarkerOptions.nameEditBox = nameEditBox
+
+
+        ----------------------------------------------------------------
         -- Edit box: macro icon ID
         ----------------------------------------------------------------
         local iconLabel = self:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
-        iconLabel:SetPoint("TOPLEFT", checkbox, "BOTTOMLEFT", 0, -20)
+        iconLabel:SetPoint("TOPLEFT", nameLabel, "BOTTOMLEFT", 0, -9)
         iconLabel:SetText("Macro icon ID:")
 
         local editBox = CreateFrame("EditBox", "FocusMarkerOptionsIconEditBox", self, "InputBoxTemplate")
@@ -440,9 +495,9 @@ do
                 local idx = nameToIndex[markerName] or 0
                 local body = BuildMacroBodyForIndex(idx)
                 local icon = GetCurrentMacroIcon()
-                local ok, err = ApplyMacroNow(MACRO_NAME, icon, body)
+                local ok, err = ApplyMacroNow(db.macroName or MACRO_NAME, icon, body)
                 if not ok and err == "incombat" then
-                    QueueMacroUpdate(MACRO_NAME, icon, body)
+                    QueueMacroUpdate(db.macroName or MACRO_NAME, icon, body)
                 end
             end
         end
@@ -463,6 +518,11 @@ do
         hint:SetJustifyH("LEFT")
         hint:SetText("This only accepts Icon ID's. If you want to change it, find a spell/ability on WoWHead and click on the icon, it will show the ID in a popup.\n" ..
                      "PS: My personal preference is 132177 (The 'Master Marksman' icon).")
+
+        local hintMaxCharacters = self:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+        hintMaxCharacters:SetPoint("RIGHT", nameEditBox, "RIGHT", 83, 0)
+        hintMaxCharacters:SetJustifyH("RIGHT")
+        hintMaxCharacters:SetText("(Max 16 characters)")
     end)
 
     -------------------------------------------------------------------

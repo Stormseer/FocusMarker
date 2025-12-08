@@ -17,7 +17,7 @@ Usage:
 | ----------- | ----------- |
 | /focusmarker      | Prints current marker and gives instructions on how to use slash commands.       |
 | /focusmarker X   | Sets the marker of your choice, i.e "/focusmarker blue" will change your macro to use the square marker. Accepts both colors and shapes.         |
-| /focusmarker options   | Opens the options panel (NYI).         |
+| /focusmarker options   | Opens the options panel.         |
 
 If you attempt to change your marker during combat, the addon will wait until after combat to change it.
 
@@ -54,4 +54,5 @@ Full list of accepted aliases:
 | Default     | Star        |
 
 Made by Aryella, on Silvermoon EU.
+
 

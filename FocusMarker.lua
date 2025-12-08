@@ -1,8 +1,10 @@
 local ADDON_NAME = "FocusMarker"
 local SAVEDVARS = "AryFocusMarkerDB"
 local MACRO_NAME = "FocusMarker"
+local MACRO_CONDITIONALS_DEFAULT = "[@mouseover,exists,nodead][]"
 local MACRO_ICON = 1033497
 local settingsCategory
+
 
 -- default
 local globalDefaults = {
@@ -130,6 +132,15 @@ local function ApplyMacroNow(name, icon, body, oldName)
     return true
 end
 
+-- Helper function to get conditionals for the macro.
+local function GetMacroConditionals()
+    if db and db.macroConditionals and db.macroConditionals ~= "" then
+        return db.macroConditionals
+    end
+    return MACRO_CONDITIONALS_DEFAULT
+end
+
+
 -- Frame to handle queued regen events
 local queuedFrame = CreateFrame("Frame", ADDON_NAME .. "QueuedFrame")
 queuedFrame:SetScript("OnEvent", function(self, event, ...)
@@ -165,14 +176,15 @@ end)
 -- Build the macro body given an index (0..8)
 local function BuildMacroBodyForIndex(idx)
     local lines = {}
+    local cond = GetMacroConditionals() or MACRO_CONDITIONALS_DEFAULT
 
     -- Only add the /focus line if we are NOT in mark-only mode
     if not (db and db.markOnly) then
-        table.insert(lines, "/focus [@mouseover,exists,nodead][]")
+        table.insert(lines, "/focus " .. cond)
     end
 
     -- Always add the targeting marker line
-    table.insert(lines, "/tm [@mouseover,exists,nodead][] " .. tostring(idx))
+    table.insert(lines, "/tm " .. cond .. " " .. tostring(idx))
 
     return table.concat(lines, "\n")
 end
@@ -341,7 +353,8 @@ SlashCmdList["FOCUSMARKER"] = function(msg)
 end
 
 -----------------------------------------------------------------------
--- Options panel 
+-- 💀💀💀💀
+-- It's all Options Panel from down here (enter at your own risk)
 -----------------------------------------------------------------------
 do
     local panel = CreateFrame("Frame", "FocusMarkerOptionsPanel")
@@ -372,7 +385,7 @@ do
         title:SetPoint("TOPLEFT", 16, -16)
         title:SetText("Focus Marker")
 
-        local desc = self:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+        local desc = self:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
         desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -8)
         desc:SetJustifyH("LEFT")
         desc:SetText("Made by Aryella on Silvermoon EU")
@@ -461,7 +474,6 @@ do
         markOnlyCheckbox:SetScript("OnClick", function(btn)
             db.markOnly = btn:GetChecked() and true or false
 
-            -- Rebuild macro with updated behavior
             local markerName = db.selectedMarker or globalDefaults.selectedMarker
             local idx = nameToIndex[markerName] or 0
             local body = BuildMacroBodyForIndex(idx)
@@ -481,10 +493,71 @@ do
         FocusMarkerOptions.markOnlyCheckbox = markOnlyCheckbox
 
         ----------------------------------------------------------------
-        -- Edit box: macro name
+        -- Edit box: Macro conditionals
+        ----------------------------------------------------------------
+        local conditionalsLabel = self:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+        conditionalsLabel:SetPoint("TOPLEFT", markOnlyCheckbox, "BOTTOMLEFT", 5, -20)
+        conditionalsLabel:SetText("Macro conditionals:")
+
+        local conditionalsEditBox = CreateFrame("EditBox", "FocusMarkerOptionsConditionalsEditBox", self, "InputBoxTemplate")
+        conditionalsEditBox:SetSize(200, 20)
+        conditionalsEditBox:SetPoint("LEFT", conditionalsLabel, "RIGHT", 10, 0)
+        conditionalsEditBox:SetAutoFocus(false)
+        conditionalsEditBox:SetText(db.macroConditionals or MACRO_CONDITIONALS_DEFAULT)
+
+        local conditionalsButton = CreateFrame("Button", "FocusMarkerOptionsConditionalReset", self, "UIPanelButtonTemplate")
+        conditionalsButton:SetSize(110, 24)
+        conditionalsButton:SetPoint("LEFT", conditionalsEditBox, "RIGHT", 4, 0)
+        conditionalsButton:SetText("Default Conditionals")
+
+        local function RebuildMacroWithCurrentSettings()
+            local markerName = db.selectedMarker or globalDefaults.selectedMarker
+            local idx = nameToIndex[markerName] or 0
+            local body = BuildMacroBodyForIndex(idx)
+            local icon = GetCurrentMacroIcon()
+            local macroName = db.macroName or MACRO_NAME
+
+            if not InCombatLockdown() then
+                local ok, err = ApplyMacroNow(macroName, icon, body)
+                if not ok and err == "incombat" then
+                    QueueMacroUpdate(macroName, icon, body)
+                end
+            else
+                QueueMacroUpdate(macroName, icon, body)
+            end
+        end
+
+        local function SaveConditionalsFromEditBox()
+            local txt = conditionalsEditBox:GetText() or ""
+            if txt == "" then
+                -- empty means "use default"
+                db.macroConditionals = nil
+            else
+                db.macroConditionals = txt
+            end
+            RebuildMacroWithCurrentSettings()
+        end
+
+        conditionalsEditBox:SetScript("OnEnterPressed", function(selfEdit)
+            SaveConditionalsFromEditBox()
+            selfEdit:ClearFocus()
+        end)
+
+        conditionalsEditBox:SetScript("OnEditFocusLost", function(selfEdit)
+            SaveConditionalsFromEditBox()
+        end)
+
+        conditionalsButton:SetScript("OnClick", function()
+            conditionalsEditBox:SetText(MACRO_CONDITIONALS_DEFAULT)
+            db.macroConditionals = nil 
+            RebuildMacroWithCurrentSettings()
+        end)
+
+        ----------------------------------------------------------------
+        -- Edit box: Macro name
         ----------------------------------------------------------------
         local nameLabel = self:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
-        nameLabel:SetPoint("TOPLEFT", markOnlyCheckbox, "BOTTOMLEFT", 3, -20)
+        nameLabel:SetPoint("TOPLEFT", conditionalsLabel, "BOTTOMLEFT", 0, -30)
         nameLabel:SetText("Macro name:")
 
         local nameEditBox = CreateFrame("EditBox", "FocusMarkerOptionsNameEditBox", self, "InputBoxTemplate")
@@ -540,7 +613,7 @@ do
         -- Edit box: macro icon ID
         ----------------------------------------------------------------
         local iconLabel = self:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
-        iconLabel:SetPoint("TOPLEFT", nameLabel, "BOTTOMLEFT", 0, -9)
+        iconLabel:SetPoint("TOPLEFT", nameLabel, "BOTTOMLEFT", -1, -9)
         iconLabel:SetText("Macro icon ID:")
 
         local editBox = CreateFrame("EditBox", "FocusMarkerOptionsIconEditBox", self, "InputBoxTemplate")
@@ -592,6 +665,9 @@ do
 
         FocusMarkerOptions.iconEditBox = editBox
 
+        -------------------------------------------------------------------
+        -- Grey Descriptive Text
+        -------------------------------------------------------------------
         local hint = self:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
         hint:SetPoint("TOPLEFT", iconLabel, "BOTTOMLEFT", 3, -8)
         hint:SetJustifyH("LEFT")

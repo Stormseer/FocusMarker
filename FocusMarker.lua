@@ -506,7 +506,7 @@ do
         conditionalsEditBox:SetText(db.macroConditionals or MACRO_CONDITIONALS_DEFAULT)
 
         local conditionalsButton = CreateFrame("Button", "FocusMarkerOptionsConditionalReset", self, "UIPanelButtonTemplate")
-        conditionalsButton:SetSize(110, 24)
+        conditionalsButton:SetSize(130, 24)
         conditionalsButton:SetPoint("LEFT", conditionalsEditBox, "RIGHT", 4, 0)
         conditionalsButton:SetText("Default Conditionals")
 
@@ -685,7 +685,6 @@ do
     -------------------------------------------------------------------
     if Settings and Settings.RegisterCanvasLayoutCategory and Settings.RegisterAddOnCategory then
         settingsCategory = Settings.RegisterCanvasLayoutCategory(panel, panel.name)
-        --category.ID = panel.name
         Settings.RegisterAddOnCategory(settingsCategory)
     else
         -- Something is wrong and can't make the options menu. AKA fuck handling multiple client versions. 

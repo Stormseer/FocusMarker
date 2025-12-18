@@ -55,4 +55,5 @@ Full list of accepted aliases:
 
 Made by Aryella, on Silvermoon EU.
 
+Curseforge: https://www.curseforge.com/wow/addons/focusmarker-assistant
 

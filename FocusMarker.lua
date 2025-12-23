@@ -183,8 +183,16 @@ local function BuildMacroBodyForIndex(idx)
         table.insert(lines, "/focus " .. cond)
     end
 
+    -- Add raid conditional only if the option is enabled
+    local tmCond = cond
+    if db and db.noRaid then
+        -- Strip outer brackets and inject nogroup:raid
+        local inner = cond:match("^%[(.*)%]$") or cond
+        tmCond = "[nogroup:raid," .. inner .. "]"
+    end
+
     -- Always add the targeting marker line
-    table.insert(lines, "/tm " .. cond .. " " .. tostring(idx))
+    table.insert(lines, "/tm " .. tmCond .. " " .. tostring(idx))
 
     return table.concat(lines, "\n")
 end
@@ -493,10 +501,43 @@ do
         FocusMarkerOptions.markOnlyCheckbox = markOnlyCheckbox
 
         ----------------------------------------------------------------
+        -- Checkbox: Don't mark in raid
+        ----------------------------------------------------------------
+        if db.noRaid == nil then
+            db.noRaid = false
+        end
+
+        local noRaidCheckbox = CreateFrame("CheckButton", "FocusMarkerOptionsNoRaidCheck", self, "ChatConfigCheckButtonTemplate")
+        noRaidCheckbox:SetPoint("TOPLEFT", markOnlyCheckbox, "BOTTOMLEFT", 0, -2)
+        noRaidCheckbox.Text:SetText("Don't mark target while in raid group")
+        noRaidCheckbox:SetChecked(db.noRaid)
+
+        noRaidCheckbox:SetScript("OnClick", function(btn)
+            db.noRaid = btn:GetChecked() and true or false
+
+            local markerName = db.selectedMarker or globalDefaults.selectedMarker
+            local idx = nameToIndex[markerName] or 0
+            local body = BuildMacroBodyForIndex(idx)
+            local icon = GetCurrentMacroIcon()
+            local macroName = db.macroName or MACRO_NAME
+
+            if not InCombatLockdown() then
+                local ok, err = ApplyMacroNow(macroName, icon, body)
+                if not ok and err == "incombat" then
+                    QueueMacroUpdate(macroName, icon, body)
+                end
+            else
+                QueueMacroUpdate(macroName, icon, body)
+            end
+        end)
+
+        FocusMarkerOptions.noRaidCheckbox = noRaidCheckbox
+
+        ----------------------------------------------------------------
         -- Edit box: Macro conditionals
         ----------------------------------------------------------------
         local conditionalsLabel = self:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
-        conditionalsLabel:SetPoint("TOPLEFT", markOnlyCheckbox, "BOTTOMLEFT", 5, -20)
+        conditionalsLabel:SetPoint("TOPLEFT", noRaidCheckbox, "BOTTOMLEFT", 5, -20)
         conditionalsLabel:SetText("Macro conditionals:")
 
         local conditionalsEditBox = CreateFrame("EditBox", "FocusMarkerOptionsConditionalsEditBox", self, "InputBoxTemplate")

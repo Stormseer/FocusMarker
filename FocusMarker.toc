@@ -2,6 +2,7 @@
 ## Version: 1.2
 ## Title: FocusMarker
 ## Notes: Helps you with marking and synchronizing markers with your party.
+## IconTexture: Interface/AddOns/FocusMarker/master-marksman
 ## Author: Aryella
 ## SavedVariables: AryFocusMarkerDB
 

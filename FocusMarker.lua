@@ -191,6 +191,11 @@ local function BuildMacroBodyForIndex(idx)
         tmCond = "[nogroup:raid," .. inner .. "]"
     end
 
+    -- If you set to no marker before marking, you can force the marker to never toggle. 
+    if db and db.noToggle then
+        table.insert(lines, "/tm " .. tmCond .. " 0")
+    end
+
     -- Always add the targeting marker line
     table.insert(lines, "/tm " .. tmCond .. " " .. tostring(idx))
 
@@ -534,10 +539,43 @@ do
         FocusMarkerOptions.noRaidCheckbox = noRaidCheckbox
 
         ----------------------------------------------------------------
+        -- Checkbox: Don't toggle marker
+        ----------------------------------------------------------------
+        if db.noToggle == nil then
+            db.noToggle = true
+        end
+
+        local noToggleCheckbox = CreateFrame("CheckButton", "FocusMarkerOptionsNoToggleCheck", self, "ChatConfigCheckButtonTemplate")
+        noToggleCheckbox:SetPoint("TOPLEFT", noRaidCheckbox, "BOTTOMLEFT", 0, -2)
+        noToggleCheckbox.Text:SetText("Don't toggle marker on multiple clicks")
+        noToggleCheckbox:SetChecked(db.noToggle)
+
+        noToggleCheckbox:SetScript("OnClick", function(btn)
+            db.noToggle = btn:GetChecked() and true or false
+
+            local markerName = db.selectedMarker or globalDefaults.selectedMarker
+            local idx = nameToIndex[markerName] or 0
+            local body = BuildMacroBodyForIndex(idx)
+            local icon = GetCurrentMacroIcon()
+            local macroName = db.macroName or MACRO_NAME
+
+            if not InCombatLockdown() then
+                local ok, err = ApplyMacroNow(macroName, icon, body)
+                if not ok and err == "incombat" then
+                    QueueMacroUpdate(macroName, icon, body)
+                end
+            else
+                QueueMacroUpdate(macroName, icon, body)
+            end
+        end)
+
+        FocusMarkerOptions.noToggleCheckbox = noToggleCheckbox
+
+        ----------------------------------------------------------------
         -- Edit box: Macro conditionals
         ----------------------------------------------------------------
         local conditionalsLabel = self:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
-        conditionalsLabel:SetPoint("TOPLEFT", noRaidCheckbox, "BOTTOMLEFT", 5, -20)
+        conditionalsLabel:SetPoint("TOPLEFT", noToggleCheckbox, "BOTTOMLEFT", 5, -20)
         conditionalsLabel:SetText("Macro conditionals:")
 
         local conditionalsEditBox = CreateFrame("EditBox", "FocusMarkerOptionsConditionalsEditBox", self, "InputBoxTemplate")

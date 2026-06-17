@@ -191,13 +191,11 @@ local function BuildMacroBodyForIndex(idx)
         tmCond = "[nogroup:raid," .. inner .. "]"
     end
 
-    -- If you set to no marker before marking, you can force the marker to never toggle. 
-    if db and db.noToggle then
-        table.insert(lines, "/tm " .. tmCond .. " 0")
+    if db and db.noToggle then -- Don't allow toggle (new from patch 12.0.7)
+        table.insert(lines, "/tm " .. tmCond .. " ~" .. tostring(idx))
+    else -- Allow toggle 
+        table.insert(lines, "/tm " .. tmCond .. " " .. tostring(idx))
     end
-
-    -- Always add the targeting marker line
-    table.insert(lines, "/tm " .. tmCond .. " " .. tostring(idx))
 
     return table.concat(lines, "\n")
 end
@@ -547,7 +545,7 @@ do
 
         local noToggleCheckbox = CreateFrame("CheckButton", "FocusMarkerOptionsNoToggleCheck", self, "ChatConfigCheckButtonTemplate")
         noToggleCheckbox:SetPoint("TOPLEFT", noRaidCheckbox, "BOTTOMLEFT", 0, -2)
-        noToggleCheckbox.Text:SetText("Don't toggle marker on multiple clicks")
+        noToggleCheckbox.Text:SetText("Don't overrwrite or toggle marker on multiple clicks")
         noToggleCheckbox:SetChecked(db.noToggle)
 
         noToggleCheckbox:SetScript("OnClick", function(btn)

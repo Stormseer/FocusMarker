@@ -1,4 +1,4 @@
-## Interface: 120001, 120000, 119999, 110207
+## Interface: 120007, 120001, 120000, 119999, 110207
 ## Version: 1.4
 ## Title: FocusMarker
 ## Notes: Helps you with marking and synchronizing markers with your party.
